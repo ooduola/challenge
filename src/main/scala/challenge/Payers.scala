@@ -1,7 +1,6 @@
 package challenge
 
-import java.time.{LocalDate, ZoneOffset}
-
+import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 import cats.Applicative
 import cats.effect.{IO, Sync}
 import doobie.implicits._
@@ -111,25 +110,24 @@ object Payers {
       * @param allPayments The payments to take into account for the balance
       */
     private def calculateBalance(
-      date: LocalDate,
-      allInvoices: List[Invoices.Invoice],
-      allPayments: List[Payments.Payment]
-    ): Double = {
-      val invoices =
-        allInvoices
-          .map(invoice => (invoice, invoice.sentAt.toEpochSecond(ZoneOffset.UTC)))
-          .sortBy(_._2)
-          .takeWhile(date.toEpochDay <= _._2)
-          .map { case (invoice, _) => invoice }
+                                  date: LocalDate,
+                                  allInvoices: List[Invoices.Invoice],
+                                  allPayments: List[Payments.Payment]
+                                ): Double = {
+      val startOfDay = date.atStartOfDay(ZoneOffset.UTC).toLocalDateTime
 
-      val payments =
-        allPayments
-          .map(payment => (payment, payment.receivedAt.toEpochSecond(ZoneOffset.UTC)))
-          .sortBy(_._2)
-          .takeWhile(date.toEpochDay <= _._2)
-          .map { case (payment, _) => payment }
+      val filteredSortedInvoices = allInvoices
+        .filter(_.sentAt.isBefore(startOfDay))
+        .sortBy(_.sentAt)
 
-      invoices.map(_.total).sum + payments.map(_.amount).sum
+      val filteredSortedPayments = allPayments
+        .filter(_.receivedAt.isBefore(startOfDay))
+        .sortBy(_.receivedAt)
+
+      val invoiceTotal = filteredSortedInvoices.map(_.total).sum
+      val paymentTotal = filteredSortedPayments.map(_.amount).sum
+
+      invoiceTotal + paymentTotal
     }
   }
 

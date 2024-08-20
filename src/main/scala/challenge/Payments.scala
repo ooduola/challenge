@@ -2,9 +2,9 @@ package challenge
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
 import cats.Applicative
 import cats.effect.{IO, Sync}
+import challenge.utils.DateTimeUtils.{formatDateTime, toUtc}
 import doobie.implicits._
 import doobie.implicits.javatime._
 import doobie.util.transactor.Transactor
@@ -13,6 +13,8 @@ import io.circe.generic.semiauto.deriveCodec
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes}
+
+import scala.util.chaining.scalaUtilChainingOps
 
 trait Payments[F[_]] {
   def get(id: Payments.Id): F[Option[Payments.Payment]]
@@ -64,8 +66,9 @@ object Payments {
 
     override def create(newPayment: New): IO[Id] = {
       val receivedAt = newPayment.receivedAt
-        .getOrElse(LocalDateTime.now())
-        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        .map(toUtc)
+        .getOrElse(toUtc(LocalDateTime.now()))
+        .pipe(formatDateTime)
 
       val q = for {
         id <- sql"""INSERT INTO payment (amount, payerId, receivedAt)

@@ -17,6 +17,8 @@ This challenge forms the basis for a conversation about how you approach develop
 **If you want to detail anything about your solution, include it here:**
 <!-- START of your notes on the solution -->
 
+Part 1:
+- Updated timestamps to UTC: Changed the implementation to store timestamps in UTC to avoid timezone related issues.
 
 <!-- END of Notes -->
 

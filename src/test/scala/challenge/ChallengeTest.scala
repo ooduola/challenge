@@ -4,14 +4,13 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
-
 import scala.concurrent.ExecutionContext.global
-
 import cats.effect.Blocker
 import cats.effect.IO
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
+import doobie.implicits._
 import doobie.util.ExecutionContexts
 import org.http4s.Uri
 import org.http4s.client.dsl.io._

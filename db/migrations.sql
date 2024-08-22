@@ -25,3 +25,12 @@ CREATE TABLE `payment` (
   `receivedAt` datetime NOT NULL,
   PRIMARY KEY (`paymentId`)
 );
+
+DROP TABLE IF EXISTS `balance`;
+CREATE TABLE balance (
+  `payerId` int(10) unsigned NOT NULL,
+  `balanceDate` datetime NOT NULL,
+  `balance` double NOT NULL,
+  PRIMARY KEY (`payerId`, `balanceDate`),
+  FOREIGN KEY (`payerId`) REFERENCES payer(payerId)
+);

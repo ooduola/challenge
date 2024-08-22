@@ -1,10 +1,10 @@
 package challenge
 
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import cats.Applicative
 import cats.effect.{IO, Sync}
-import challenge.utils.DateTimeUtils.{formatDateTime, toUtc}
+import challenge.utils.DateTimeUtils._
+import doobie.ConnectionIO
 import doobie.implicits._
 import doobie.implicits.javatime._
 import doobie.util.transactor.Transactor
@@ -14,7 +14,6 @@ import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes}
 
-import scala.util.chaining.scalaUtilChainingOps
 
 trait Payments[F[_]] {
   def get(id: Payments.Id): F[Option[Payments.Payment]]
@@ -68,17 +67,40 @@ object Payments {
       val receivedAt = newPayment.receivedAt
         .map(toUtc)
         .getOrElse(toUtc(LocalDateTime.now()))
-        .pipe(formatDateTime)
 
-      val q = for {
-        id <- sql"""INSERT INTO payment (amount, payerId, receivedAt)
-                  |VALUES (${newPayment.amount}, ${newPayment.payerId}, $receivedAt)
-                 """.stripMargin.update.withUniqueGeneratedKeys[Int]("paymentId")
-      } yield Id(id)
+      val createPaymentQuery = for {
+        paymentId <- insertPayment(newPayment, receivedAt)
+        previousBalance <- getPreviousBalance(newPayment.payerId, receivedAt)
+        newBalance = previousBalance.getOrElse(0.0) + newPayment.amount
+        _ <- updateBalance(newPayment.payerId, receivedAt, newBalance)
+      } yield Id(paymentId)
 
-      q.transact(tx)
+      createPaymentQuery.transact(tx)
     }
-  }
+
+    private def insertPayment(newPayment: New, receivedAt: LocalDateTime): ConnectionIO[Int] =
+      sql"""
+            |INSERT INTO payment (amount, payerId, receivedAt)
+            |VALUES (${newPayment.amount}, ${newPayment.payerId}, $receivedAt)
+    """.stripMargin.update.withUniqueGeneratedKeys[Int]("paymentId")
+
+    private def getPreviousBalance(payerId: Int, receivedAt: LocalDateTime): ConnectionIO[Option[Double]] =
+      sql"""
+            |SELECT balance
+            |FROM balance
+            |WHERE payerId = $payerId AND balanceDate <= $receivedAt
+            |ORDER BY balanceDate DESC
+            |LIMIT 1
+    """.stripMargin.query[Double].option
+
+    private def updateBalance(payerId: Int, balanceDate: LocalDateTime, balance: Double): ConnectionIO[Int] =
+      sql"""
+            |INSERT INTO balance (payerId, balanceDate, balance)
+            |VALUES ($payerId, $balanceDate, $balance)
+            |ON DUPLICATE KEY UPDATE balance = VALUES(balance)
+    """.stripMargin.update.run
+    }
+
 
   def routes(payments: Payments[IO]): HttpRoutes[IO] = {
     val dsl = new Http4sDsl[IO] {}

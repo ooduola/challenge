@@ -7,6 +7,16 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext.global
 import cats.effect.Blocker
 import cats.effect.IO
+import challenge.model.invoices.Invoice.Invoice
+import challenge.model.invoices.InvoiceId.InvoiceId
+import challenge.model.invoices.NewInvoice.NewInvoice
+import challenge.model.payers.Balance.Balance
+import challenge.model.payers.NewPayer.NewPayer
+import challenge.model.payers.PayerId.PayerId
+import challenge.model.payers.Payers.Payer
+import challenge.model.payments.NewPayment.NewPayment
+import challenge.model.payments.Payment.Payment
+import challenge.model.payments.PaymentId.PaymentId
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
@@ -40,52 +50,52 @@ class ChallengeTest extends AnyFreeSpec with Matchers {
   "Payers" - {
     "should be creatable" in {
       val io = for {
-        createReq <- POST(Payers.New("Mr Jameson"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(createReq).flatMap(_.as[Payers.Id])
+        createReq <- POST(NewPayer("Mr Jameson"), uri"""http://0.0.0.0:8080/payer""")
+        payerId <- payersService.orNotFound.run(createReq).flatMap(_.as[PayerId])
 
         fetchReq <- GET(uri"""http://0.0.0.0:8080/payer/""".addSegment(payerId.id.toString))
-        payer <- payersService.orNotFound.run(fetchReq).flatMap(_.as[Payers.Payer])
-      } yield payer should matchPattern { case Payers.Payer(id, _) if id == payerId.id => }
+        payer <- payersService.orNotFound.run(fetchReq).flatMap(_.as[Payer])
+      } yield payer should matchPattern { case Payer(id, _) if id == payerId.id => }
 
       io.unsafeRunSync()
     }
 
     "should have the right balance after adding invoices and payments" in {
       val io = for {
-        payerReq <- POST(Payers.New("Mrs Brodie"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[Payers.Id])
+        payerReq <- POST(NewPayer("Mrs Brodie"), uri"""http://0.0.0.0:8080/payer""")
+        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
         // Add invoice of -100
         invReq1 <- POST(
-          Invoices.New(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 30))),
+          NewInvoice(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
         _ <- invoicesService.orNotFound.run(invReq1).flatMap(_.as[Unit])
 
         // Add payment of 50
         paymentReq <- POST(
-          Payments.New(50, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 45))),
+          NewPayment(50, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 45))),
           uri"""http://0.0.0.0:8080/payment"""
         )
         _ <- paymentsService.orNotFound.run(paymentReq).flatMap(_.as[Unit])
 
         // Add invoice of -100
         invReq2 <- POST(
-          Invoices.New(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 17, 30))),
+          NewInvoice(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 17, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
         _ <- invoicesService.orNotFound.run(invReq2).flatMap(_.as[Unit])
 
         // Add invoice of -250
         invReq3 <- POST(
-          Invoices.New(-250, payerId.id, Some(LocalDateTime.of(2020, 10, 11, 11, 30))),
+          NewInvoice(-250, payerId.id, Some(LocalDateTime.of(2020, 10, 11, 11, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
         _ <- invoicesService.orNotFound.run(invReq3).flatMap(_.as[Unit])
 
         // Add payment of 100
         paymentReq <- POST(
-          Payments.New(100, payerId.id, Some(LocalDateTime.of(2020, 10, 12, 11, 27))),
+          NewPayment(100, payerId.id, Some(LocalDateTime.of(2020, 10, 12, 11, 27))),
           uri"""http://0.0.0.0:8080/payment"""
         )
         _ <- paymentsService.orNotFound.run(paymentReq).flatMap(_.as[Unit])
@@ -94,7 +104,7 @@ class ChallengeTest extends AnyFreeSpec with Matchers {
         targetDate = LocalDate.of(2020, 10, 11).format(DateTimeFormatter.ISO_DATE)
         balancePath <- IO.fromEither(Uri.fromString(s"http://0.0.0.0:8080/payer/${payerId.id}/balance/$targetDate"))
         balanceReq <- GET(balancePath)
-        balance <- payersService.orNotFound.run(balanceReq).flatMap(_.as[Payers.Balance])
+        balance <- payersService.orNotFound.run(balanceReq).flatMap(_.as[Balance])
       } yield assertResult(-150)(balance.balance)
 
       io.unsafeRunSync()
@@ -104,15 +114,15 @@ class ChallengeTest extends AnyFreeSpec with Matchers {
   "Invoices" - {
     "should be creatable" in {
       val io = for {
-        payerReq <- POST(Payers.New("Ms Ferrara"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[Payers.Id])
+        payerReq <- POST(NewPayer("Ms Ferrara"), uri"""http://0.0.0.0:8080/payer""")
+        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
-        invCreateReq <- POST(Invoices.New(100, payerId.id, None), uri"""http://0.0.0.0:8080/invoice""")
-        invoiceId <- invoicesService.orNotFound.run(invCreateReq).flatMap(_.as[Invoices.Id])
+        invCreateReq <- POST(NewInvoice(100, payerId.id, None), uri"""http://0.0.0.0:8080/invoice""")
+        invoiceId <- invoicesService.orNotFound.run(invCreateReq).flatMap(_.as[InvoiceId])
 
         invFetchReq <- GET(uri"""http://0.0.0.0:8080/invoice""".addSegment(invoiceId.id.toString))
-        invoice <- invoicesService.orNotFound.run(invFetchReq).flatMap(_.as[Invoices.Invoice])
-      } yield invoice should matchPattern { case Invoices.Invoice(id, _, _, _) if id == invoiceId.id => }
+        invoice <- invoicesService.orNotFound.run(invFetchReq).flatMap(_.as[Invoice])
+      } yield invoice should matchPattern { case Invoice(id, _, _, _) if id == invoiceId.id => }
 
       io.unsafeRunSync()
     }
@@ -121,15 +131,15 @@ class ChallengeTest extends AnyFreeSpec with Matchers {
   "Payments" - {
     "should be creatable" in {
       val io = for {
-        payerReq <- POST(Payers.New("Dr Theodore"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[Payers.Id])
+        payerReq <- POST(NewPayer("Dr Theodore"), uri"""http://0.0.0.0:8080/payer""")
+        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
-        paymentCreateReq <- POST(Payments.New(75, payerId.id, None), uri"""http://0.0.0.0:8080/payment""")
-        paymentId <- paymentsService.orNotFound.run(paymentCreateReq).flatMap(_.as[Payments.Id])
+        paymentCreateReq <- POST(NewPayment(75, payerId.id, None), uri"""http://0.0.0.0:8080/payment""")
+        paymentId <- paymentsService.orNotFound.run(paymentCreateReq).flatMap(_.as[PaymentId])
 
         paymentFetchReq <- GET(uri"""http://0.0.0.0:8080/payment""".addSegment(paymentId.id.toString))
-        payment <- paymentsService.orNotFound.run(paymentFetchReq).flatMap(_.as[Payments.Payment])
-      } yield payment should matchPattern { case Payments.Payment(id, _, _, _) if id == paymentId.id => }
+        payment <- paymentsService.orNotFound.run(paymentFetchReq).flatMap(_.as[Payment])
+      } yield payment should matchPattern { case Payment(id, _, _, _) if id == paymentId.id => }
 
       io.unsafeRunSync()
     }

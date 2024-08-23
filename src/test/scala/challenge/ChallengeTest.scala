@@ -17,6 +17,7 @@ import challenge.model.payers.Payers.Payer
 import challenge.model.payments.NewPayment.NewPayment
 import challenge.model.payments.Payment.Payment
 import challenge.model.payments.PaymentId.PaymentId
+import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
@@ -26,10 +27,12 @@ import org.http4s.Uri
 import org.http4s.client.dsl.io._
 import org.http4s.dsl.io._
 import org.http4s.implicits._
+import org.mockito.MockitoSugar
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class ChallengeTest extends AnyFreeSpec with Matchers {
+
+class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
   val blockingPool = Executors.newFixedThreadPool(5)
   val blocker = Blocker.liftExecutorService(blockingPool)
   implicit val cs = IO.contextShift(ExecutionContexts.synchronous)
@@ -41,11 +44,15 @@ class ChallengeTest extends AnyFreeSpec with Matchers {
   config.setPassword("root")
 
   // Use this Transactor with the HikariConfig above for MySQL
-  val tx: HikariTransactor[IO] = HikariTransactor(new HikariDataSource(config), global, blocker)
+  implicit val tx: HikariTransactor[IO] = HikariTransactor(new HikariDataSource(config), global, blocker)
 
-  val payersService = Payers.routes(Payers.impl(tx))
-  val invoicesService = Invoices.routes(Invoices.impl(tx))
-  val paymentsService = Payments.routes(Payments.impl(tx))
+  val payerRepo = new PayerRepositoryImpl
+  val paymentRepo = new PaymentRepositoryImpl
+  val invoiceRepo = new InvoiceRepositoryImpl
+
+  val payersService = Payers.routes(Payers.impl(payerRepo))
+  val invoicesService = Invoices.routes(Invoices.impl(invoiceRepo))
+  val paymentsService = Payments.routes(Payments.impl(paymentRepo))
 
   "Payers" - {
     "should be creatable" in {

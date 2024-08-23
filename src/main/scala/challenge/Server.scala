@@ -2,6 +2,7 @@ package challenge
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.implicits._
+import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
 import doobie.util.transactor.Transactor
 import fs2._
 import org.http4s.implicits._
@@ -14,9 +15,16 @@ object Server {
   val resources = Resources.MySQL("root", "root")
 
   def stream(tx: Transactor[IO])(implicit F: ConcurrentEffect[IO], T: Timer[IO]): Stream[IO, Nothing] = {
-    val invoicesImpl = Invoices.impl(tx)
-    val paymentsImpl = Payments.impl(tx)
-    val payersImpl = Payers.impl(tx)
+
+    implicit val transactor: Transactor[IO] = tx
+
+    val payerRepo = new PayerRepositoryImpl
+    val paymentRepo = new PaymentRepositoryImpl
+    val invoiceRepo = new InvoiceRepositoryImpl
+
+    val invoicesImpl = Invoices.impl(invoiceRepo)
+    val paymentsImpl = Payments.impl(paymentRepo)
+    val payersImpl = Payers.impl(payerRepo)
 
     // Compose our various routes. They are tried in turn until one matches.
     // If none match, we return a 404 response

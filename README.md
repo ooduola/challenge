@@ -17,8 +17,11 @@ This challenge forms the basis for a conversation about how you approach develop
 **If you want to detail anything about your solution, include it here:**
 <!-- START of your notes on the solution -->
 
-**Part 1**: Updated timestamps to UTC: Changed the implementation to store timestamps in UTC to avoid timezone related issues.<br><br>
-**Part 2:** To address this inefficiency, I introduced a new `balance` table that tracks the balance for each payer at specific points in time (balanceDate). This approach allows the system to calculate balances incrementally rather than recomputing them from scratch with every query.
+**Part 1**: 
+Updated timestamps to UTC: Changed the implementation to store timestamps in UTC to avoid timezone related issues.<br><br>
+**Part 2:** 
+1. To address this inefficiency, I introduced a new `balance` table that tracks the balance for each payer at specific points in time (balanceDate). This approach allows the system to calculate balances incrementally rather than recomputing them from scratch with every query.
+2. Implemented fall back balance calculation from invoices and payments if balance DB is down. 
 
 <!-- END of Notes -->
 

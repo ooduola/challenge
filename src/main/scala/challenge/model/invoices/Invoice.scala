@@ -2,7 +2,7 @@ package challenge.model.invoices
 
 import cats.Applicative
 import cats.effect.Sync
-import challenge.{Invoices, Payers}
+import challenge.service.PayersService
 import io.circe.Codec
 import io.circe.generic.semiauto.deriveCodec
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
@@ -12,7 +12,7 @@ import java.time.LocalDateTime
 
 object Invoice {
 
-  /** An [[Invoice]] is a document issued to a given [[Payers.Payer]],
+  /** An [[Invoice]] is a document issued to a given [[PayersService.Payer]],
    * detailing an amount owed by that payer for various goods and services provided.
    *
    * Here we are omitting the details, and only care about the amount owed and

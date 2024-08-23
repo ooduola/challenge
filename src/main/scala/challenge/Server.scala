@@ -2,7 +2,9 @@ package challenge
 
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.implicits._
+import challenge.http._
 import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
+import challenge.service.{InvoicesService, PayersService, PaymentsService}
 import doobie.util.transactor.Transactor
 import fs2._
 import org.http4s.implicits._
@@ -22,17 +24,18 @@ object Server {
     val paymentRepo = new PaymentRepositoryImpl
     val invoiceRepo = new InvoiceRepositoryImpl
 
-    val invoicesImpl = Invoices.impl(invoiceRepo)
-    val paymentsImpl = Payments.impl(paymentRepo)
-    val payersImpl = Payers.impl(payerRepo)
+    val invoicesImpl = InvoicesService.impl(invoiceRepo)
+    val paymentsImpl = PaymentsService.impl(paymentRepo)
+    val payersImpl = PayersService.impl(payerRepo)
+
+
+    val invoiceRoutes = new InvoiceRoutes(invoicesImpl).routes
+    val paymentRoutes = new PaymentRoutes(paymentsImpl).routes
+    val payersRoutes = new PayersRoutes(payersImpl).routes
 
     // Compose our various routes. They are tried in turn until one matches.
     // If none match, we return a 404 response
-    val httpApp = (
-      Invoices.routes(invoicesImpl) <+>
-        Payments.routes(paymentsImpl) <+>
-        Payers.routes(payersImpl)
-    ).orNotFound
+    val httpApp = (invoiceRoutes <+> paymentRoutes <+> payersRoutes).orNotFound
 
     // With Middlewares in place
     val finalHttpApp = Logger.httpApp(logHeaders = true, logBody = true)(httpApp)

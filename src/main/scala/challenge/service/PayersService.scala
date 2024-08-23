@@ -1,4 +1,4 @@
-package challenge
+package challenge.service
 
 import cats.effect.IO
 import challenge.model.invoices.Invoice.Invoice
@@ -8,22 +8,19 @@ import challenge.model.payers.PayerId.PayerId
 import challenge.model.payers.Payers.Payer
 import challenge.model.payments.Payment.Payment
 import challenge.repository.PayerRepository
-import doobie.implicits._
 import doobie.util.transactor.Transactor
-import org.http4s.HttpRoutes
-import org.http4s.dsl.Http4sDsl
 
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 
-trait Payers[F[_]] {
+trait PayersService[F[_]] {
   def get(id: PayerId): F[Option[Payer]]
   def create(payer: NewPayer): F[PayerId]
   def balance(payerId: PayerId, date: LocalDate): F[Balance]
 }
 
-object Payers {
+object PayersService {
 
-  def impl(repository: PayerRepository[IO])(implicit tx: Transactor[IO]): Payers[IO] = new Payers[IO] {
+  def impl(repository: PayerRepository[IO])(implicit tx: Transactor[IO]): PayersService[IO] = new PayersService[IO] {
     override def get(payerId: PayerId): IO[Option[Payer]] = {
       repository.get(payerId)
     }
@@ -84,26 +81,5 @@ object Payers {
       invoiceTotal - paymentTotal
     }
 
-  }
-
-  def routes(payers: Payers[IO]): HttpRoutes[IO] = {
-    val dsl = new Http4sDsl[IO] {}
-    import dsl._
-
-    HttpRoutes.of[IO] {
-      case GET -> Root / "payer" / IntVar(payerId) =>
-        payers.get(PayerId(payerId)).flatMap {
-          case Some(payer) => Ok(payer)
-          case None        => NotFound()
-        }
-
-      case req @ POST -> Root / "payer" =>
-        req.decode[NewPayer] { input =>
-          payers.create(input).flatMap(Ok(_))
-        }
-
-      case GET -> Root / "payer" / payerId / "balance" / date =>
-        payers.balance(PayerId(payerId.toInt), LocalDate.parse(date)).flatMap(Ok(_))
-    }
   }
 }

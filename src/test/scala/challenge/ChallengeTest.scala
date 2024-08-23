@@ -7,6 +7,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext.global
 import cats.effect.Blocker
 import cats.effect.IO
+import challenge.http.{InvoiceRoutes, PayersRoutes, PaymentRoutes}
 import challenge.model.invoices.Invoice.Invoice
 import challenge.model.invoices.InvoiceId.InvoiceId
 import challenge.model.invoices.NewInvoice.NewInvoice
@@ -18,12 +19,13 @@ import challenge.model.payments.NewPayment.NewPayment
 import challenge.model.payments.Payment.Payment
 import challenge.model.payments.PaymentId.PaymentId
 import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
+import challenge.service.{InvoicesService, PayersService, PaymentsService}
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
 import doobie.implicits._
 import doobie.util.ExecutionContexts
-import org.http4s.Uri
+import org.http4s.{HttpRoutes, Uri}
 import org.http4s.client.dsl.io._
 import org.http4s.dsl.io._
 import org.http4s.implicits._
@@ -50,18 +52,23 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
   val paymentRepo = new PaymentRepositoryImpl
   val invoiceRepo = new InvoiceRepositoryImpl
 
-  val payersService = Payers.routes(Payers.impl(payerRepo))
-  val invoicesService = Invoices.routes(Invoices.impl(invoiceRepo))
-  val paymentsService = Payments.routes(Payments.impl(paymentRepo))
+  val payersService: PayersService[IO] = PayersService.impl(payerRepo)
+  val invoicesService: InvoicesService[IO] = InvoicesService.impl(invoiceRepo)
+  val paymentsService: PaymentsService[IO] = PaymentsService.impl(paymentRepo)
+  
+  val invoiceRoutes: HttpRoutes[IO] = new InvoiceRoutes(invoicesService).routes
+  val paymentRoutes: HttpRoutes[IO] = new PaymentRoutes(paymentsService).routes
+  val payersRoutes: HttpRoutes[IO] = new PayersRoutes(payersService).routes
+  
 
   "Payers" - {
     "should be creatable" in {
       val io = for {
         createReq <- POST(NewPayer("Mr Jameson"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(createReq).flatMap(_.as[PayerId])
+        payerId <- payersRoutes.orNotFound.run(createReq).flatMap(_.as[PayerId])
 
         fetchReq <- GET(uri"""http://0.0.0.0:8080/payer/""".addSegment(payerId.id.toString))
-        payer <- payersService.orNotFound.run(fetchReq).flatMap(_.as[Payer])
+        payer <- payersRoutes.orNotFound.run(fetchReq).flatMap(_.as[Payer])
       } yield payer should matchPattern { case Payer(id, _) if id == payerId.id => }
 
       io.unsafeRunSync()
@@ -70,48 +77,48 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
     "should have the right balance after adding invoices and payments" in {
       val io = for {
         payerReq <- POST(NewPayer("Mrs Brodie"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
+        payerId <- payersRoutes.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
         // Add invoice of -100
         invReq1 <- POST(
           NewInvoice(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
-        _ <- invoicesService.orNotFound.run(invReq1).flatMap(_.as[Unit])
+        _ <- invoiceRoutes.orNotFound.run(invReq1).flatMap(_.as[Unit])
 
         // Add payment of 50
         paymentReq <- POST(
           NewPayment(50, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 14, 45))),
           uri"""http://0.0.0.0:8080/payment"""
         )
-        _ <- paymentsService.orNotFound.run(paymentReq).flatMap(_.as[Unit])
+        _ <- paymentRoutes.orNotFound.run(paymentReq).flatMap(_.as[Unit])
 
         // Add invoice of -100
         invReq2 <- POST(
           NewInvoice(-100, payerId.id, Some(LocalDateTime.of(2020, 10, 10, 17, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
-        _ <- invoicesService.orNotFound.run(invReq2).flatMap(_.as[Unit])
+        _ <- invoiceRoutes.orNotFound.run(invReq2).flatMap(_.as[Unit])
 
         // Add invoice of -250
         invReq3 <- POST(
           NewInvoice(-250, payerId.id, Some(LocalDateTime.of(2020, 10, 11, 11, 30))),
           uri"""http://0.0.0.0:8080/invoice"""
         )
-        _ <- invoicesService.orNotFound.run(invReq3).flatMap(_.as[Unit])
+        _ <- invoiceRoutes.orNotFound.run(invReq3).flatMap(_.as[Unit])
 
         // Add payment of 100
         paymentReq <- POST(
           NewPayment(100, payerId.id, Some(LocalDateTime.of(2020, 10, 12, 11, 27))),
           uri"""http://0.0.0.0:8080/payment"""
         )
-        _ <- paymentsService.orNotFound.run(paymentReq).flatMap(_.as[Unit])
+        _ <- paymentRoutes.orNotFound.run(paymentReq).flatMap(_.as[Unit])
 
         // Get balance on 2020-10-11
         targetDate = LocalDate.of(2020, 10, 11).format(DateTimeFormatter.ISO_DATE)
         balancePath <- IO.fromEither(Uri.fromString(s"http://0.0.0.0:8080/payer/${payerId.id}/balance/$targetDate"))
         balanceReq <- GET(balancePath)
-        balance <- payersService.orNotFound.run(balanceReq).flatMap(_.as[Balance])
+        balance <- payersRoutes.orNotFound.run(balanceReq).flatMap(_.as[Balance])
       } yield assertResult(-150)(balance.balance)
 
       io.unsafeRunSync()
@@ -122,13 +129,13 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
     "should be creatable" in {
       val io = for {
         payerReq <- POST(NewPayer("Ms Ferrara"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
+        payerId <- payersRoutes.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
         invCreateReq <- POST(NewInvoice(100, payerId.id, None), uri"""http://0.0.0.0:8080/invoice""")
-        invoiceId <- invoicesService.orNotFound.run(invCreateReq).flatMap(_.as[InvoiceId])
+        invoiceId <- invoiceRoutes.orNotFound.run(invCreateReq).flatMap(_.as[InvoiceId])
 
         invFetchReq <- GET(uri"""http://0.0.0.0:8080/invoice""".addSegment(invoiceId.id.toString))
-        invoice <- invoicesService.orNotFound.run(invFetchReq).flatMap(_.as[Invoice])
+        invoice <- invoiceRoutes.orNotFound.run(invFetchReq).flatMap(_.as[Invoice])
       } yield invoice should matchPattern { case Invoice(id, _, _, _) if id == invoiceId.id => }
 
       io.unsafeRunSync()
@@ -139,13 +146,13 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
     "should be creatable" in {
       val io = for {
         payerReq <- POST(NewPayer("Dr Theodore"), uri"""http://0.0.0.0:8080/payer""")
-        payerId <- payersService.orNotFound.run(payerReq).flatMap(_.as[PayerId])
+        payerId <- payersRoutes.orNotFound.run(payerReq).flatMap(_.as[PayerId])
 
         paymentCreateReq <- POST(NewPayment(75, payerId.id, None), uri"""http://0.0.0.0:8080/payment""")
-        paymentId <- paymentsService.orNotFound.run(paymentCreateReq).flatMap(_.as[PaymentId])
+        paymentId <- paymentRoutes.orNotFound.run(paymentCreateReq).flatMap(_.as[PaymentId])
 
         paymentFetchReq <- GET(uri"""http://0.0.0.0:8080/payment""".addSegment(paymentId.id.toString))
-        payment <- paymentsService.orNotFound.run(paymentFetchReq).flatMap(_.as[Payment])
+        payment <- paymentRoutes.orNotFound.run(paymentFetchReq).flatMap(_.as[Payment])
       } yield payment should matchPattern { case Payment(id, _, _, _) if id == paymentId.id => }
 
       io.unsafeRunSync()

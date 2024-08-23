@@ -12,10 +12,9 @@ import java.time.LocalDateTime
 object NewInvoice {
 
   final case class NewInvoice(total: Double, payerId: Int, sentAt: Option[LocalDateTime])
-  object NewInvoice {
-    implicit val codec: Codec[NewInvoice] = deriveCodec[NewInvoice]
-    implicit def entityDecoder[F[_]: Sync]: EntityDecoder[F, NewInvoice] = jsonOf
-    implicit def entityEncoder[F[_]: Applicative]: EntityEncoder[F, NewInvoice] = jsonEncoderOf
-  }
+
+  implicit val codec: Codec[NewInvoice] = deriveCodec[NewInvoice]
+  implicit def entityDecoder[F[_]: Sync]: EntityDecoder[F, NewInvoice] = jsonOf
+  implicit def entityEncoder[F[_]: Applicative]: EntityEncoder[F, NewInvoice] = jsonEncoderOf
 
 }

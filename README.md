@@ -22,6 +22,7 @@ Updated timestamps to UTC: Changed the implementation to store timestamps in UTC
 **Part 2:** 
 1. To address this inefficiency, I introduced a new `balance` table that tracks the balance for each payer at specific points in time (balanceDate). This approach allows the system to calculate balances incrementally rather than recomputing them from scratch with every query.
 2. Implemented fall back balance calculation from invoices and payments if balance DB is down. 
+3. Refactor project structure
 
 <!-- END of Notes -->
 

@@ -7,8 +7,6 @@ import io.circe.generic.semiauto.deriveCodec
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.{EntityDecoder, EntityEncoder}
 
-import java.time.LocalDateTime
-
 object Payers {
 
   /** A [[Payer]] is a person or entity to which invoices can be sent

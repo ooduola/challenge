@@ -18,12 +18,11 @@ import challenge.model.payers.Payers.Payer
 import challenge.model.payments.NewPayment.NewPayment
 import challenge.model.payments.Payment.Payment
 import challenge.model.payments.PaymentId.PaymentId
-import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
+import challenge.repository.{InvoiceRepositoryImpl, PayerRepository, PayerRepositoryImpl, PaymentRepositoryImpl}
 import challenge.service.{InvoicesService, PayersService, PaymentsService}
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import doobie.hikari.HikariTransactor
-import doobie.implicits._
 import doobie.util.ExecutionContexts
 import org.http4s.{HttpRoutes, Uri}
 import org.http4s.client.dsl.io._
@@ -61,7 +60,7 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
   val payersRoutes: HttpRoutes[IO] = new PayersRoutes(payersService).routes
   
 
-  "Payers" - {
+  "PayersService" - {
     "should be creatable" in {
       val io = for {
         createReq <- POST(NewPayer("Mr Jameson"), uri"""http://0.0.0.0:8080/payer""")
@@ -123,9 +122,40 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
 
       io.unsafeRunSync()
     }
+
+    "should fallback to calculate balance when DB balance is not available" in {
+      val mockPayerRepo = mock[PayerRepository[IO]]
+      val payersService = PayersService.impl(mockPayerRepo)
+
+      val payerId = PayerId(1)
+      val testDate = LocalDate.of(2020, 10, 11)
+      val testStartOfDay = testDate.atStartOfDay()
+
+      // Mock repository to return None for balance
+      when(mockPayerRepo.getBalance(payerId, testDate)).thenReturn(IO.pure(None))
+
+      // Mock repository to return test invoices and payments
+      val invoices = List(
+        Invoice(1, -100, payerId.id, testStartOfDay.minusHours(2)),
+        Invoice(2, -50, payerId.id, testStartOfDay.minusHours(1))
+      )
+
+      val payments = List(
+        Payment(1, 100, payerId.id, testStartOfDay.minusHours(1)),
+        Payment(2, 50, payerId.id, testStartOfDay.plusHours(4))
+      )
+
+      when(mockPayerRepo.getInvoices(payerId, testStartOfDay)).thenReturn(IO.pure(invoices))
+      when(mockPayerRepo.getPayments(payerId, testStartOfDay)).thenReturn(IO.pure(payments))
+
+      val balanceResult = payersService.balance(payerId, testDate).unsafeRunSync()
+
+      balanceResult shouldEqual Balance(payerId.id, -50.0)
+    }
+
   }
 
-  "Invoices" - {
+  "InvoicesService" - {
     "should be creatable" in {
       val io = for {
         payerReq <- POST(NewPayer("Ms Ferrara"), uri"""http://0.0.0.0:8080/payer""")
@@ -142,7 +172,7 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
     }
   }
 
-  "Payments" - {
+  "PaymentsService" - {
     "should be creatable" in {
       val io = for {
         payerReq <- POST(NewPayer("Dr Theodore"), uri"""http://0.0.0.0:8080/payer""")

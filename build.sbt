@@ -4,6 +4,7 @@ val DoobieVersion = "0.9.0"
 val LogbackVersion = "1.2.3"
 val MysqlConnectorVersion = "8.0.21"
 val ScalaTestVersion = "3.2.0"
+val MockitoVersion = "1.17.37"
 
 lazy val root = (project in file("."))
   .settings(
@@ -23,7 +24,8 @@ lazy val root = (project in file("."))
       "ch.qos.logback" % "logback-classic" % LogbackVersion,
       "mysql" % "mysql-connector-java" % MysqlConnectorVersion,
       "org.scalactic" %% "scalactic" % ScalaTestVersion,
-      "org.scalatest" %% "scalatest" % ScalaTestVersion % "test"
+      "org.scalatest" %% "scalatest" % ScalaTestVersion % Test,
+      "org.mockito" %% "mockito-scala" % MockitoVersion % Test
     ),
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
   )

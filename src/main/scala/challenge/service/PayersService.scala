@@ -8,7 +8,6 @@ import challenge.model.payers.PayerId.PayerId
 import challenge.model.payers.Payers.Payer
 import challenge.model.payments.Payment.Payment
 import challenge.repository.PayerRepository
-import doobie.util.transactor.Transactor
 
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 
@@ -20,7 +19,7 @@ trait PayersService[F[_]] {
 
 object PayersService {
 
-  def impl(repository: PayerRepository[IO])(implicit tx: Transactor[IO]): PayersService[IO] = new PayersService[IO] {
+  def impl(repository: PayerRepository[IO]): PayersService[IO] = new PayersService[IO] {
     override def get(payerId: PayerId): IO[Option[Payer]] = {
       repository.get(payerId)
     }
@@ -34,7 +33,7 @@ object PayersService {
         case Some(balance) =>
           IO.pure(Balance(payerId.id, balance))
 
-        case _ =>
+        case None =>
           calculateFallbackBalance(payerId, date)
       }
     }
@@ -78,7 +77,7 @@ object PayersService {
       val invoiceTotal = filteredSortedInvoices.map(_.total).sum
       val paymentTotal = filteredSortedPayments.map(_.amount).sum
 
-      invoiceTotal - paymentTotal
+      invoiceTotal + paymentTotal
     }
 
   }

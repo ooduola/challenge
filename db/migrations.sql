@@ -34,3 +34,13 @@ CREATE TABLE balance (
   PRIMARY KEY (`payerId`, `balanceDate`),
   FOREIGN KEY (`payerId`) REFERENCES payer(payerId)
 );
+
+DROP TABLE IF EXISTS `payment_invoice`;
+CREATE TABLE `payment_invoice` (
+   `paymentId` int(10) unsigned NOT NULL,
+   `invoiceId` int(10) unsigned NOT NULL,
+   `amountPaid` double unsigned NOT NULL,
+   PRIMARY KEY (`paymentId`, `invoiceId`),
+   FOREIGN KEY (`paymentId`) REFERENCES `payment`(`paymentId`) ON DELETE CASCADE,
+   FOREIGN KEY (`invoiceId`) REFERENCES `invoice`(`invoiceId`) ON DELETE CASCADE
+);

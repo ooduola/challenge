@@ -5,6 +5,7 @@ import challenge.model.payments.NewPayment.NewPayment
 import challenge.model.payments.PaymentId.PaymentId
 import challenge.service.PaymentsService
 import org.http4s.HttpRoutes
+import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.dsl.Http4sDsl
 
 class PaymentRoutes(paymentService: PaymentsService[IO]) extends Http4sDsl[IO] {
@@ -16,6 +17,9 @@ class PaymentRoutes(paymentService: PaymentsService[IO]) extends Http4sDsl[IO] {
         case Some(payment) => Ok(payment)
         case None          => NotFound()
       }
+
+    case GET -> Root / "paymentInvoices" / IntVar(paymentId) =>
+      paymentService.getInvoicesByPayment(PaymentId(paymentId)).flatMap(Ok(_))
 
     case req @ POST -> Root / "payment" =>
       req.decode[NewPayment] { input =>

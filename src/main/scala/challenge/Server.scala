@@ -3,7 +3,7 @@ package challenge
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.implicits._
 import challenge.http._
-import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentRepositoryImpl}
+import challenge.repository.{InvoiceRepositoryImpl, PayerRepositoryImpl, PaymentInvoiceRepositoryImpl, PaymentRepositoryImpl}
 import challenge.service.{InvoicesService, PayersService, PaymentsService}
 import doobie.util.transactor.Transactor
 import fs2._
@@ -23,9 +23,10 @@ object Server {
     val payerRepo = new PayerRepositoryImpl
     val paymentRepo = new PaymentRepositoryImpl
     val invoiceRepo = new InvoiceRepositoryImpl
+    val paymentInvoiceRepo = new PaymentInvoiceRepositoryImpl
 
     val invoicesImpl = InvoicesService.impl(invoiceRepo)
-    val paymentsImpl = PaymentsService.impl(paymentRepo)
+    val paymentsImpl = PaymentsService.impl(paymentRepo, invoiceRepo, paymentInvoiceRepo)
     val payersImpl = PayersService.impl(payerRepo)
 
 

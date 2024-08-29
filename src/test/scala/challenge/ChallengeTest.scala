@@ -7,7 +7,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext.global
 import cats.effect.Blocker
 import cats.effect.IO
-import challenge.http.{InvoiceRoutes, PayersRoutes, PaymentRoutes}
+import challenge.http._
 import challenge.model.invoices.Invoice.Invoice
 import challenge.model.invoices.InvoiceId.InvoiceId
 import challenge.model.invoices.NewInvoice.NewInvoice
@@ -18,7 +18,7 @@ import challenge.model.payers.Payers.Payer
 import challenge.model.payments.NewPayment.NewPayment
 import challenge.model.payments.Payment.Payment
 import challenge.model.payments.PaymentId.PaymentId
-import challenge.repository.{InvoiceRepositoryImpl, PayerRepository, PayerRepositoryImpl, PaymentRepositoryImpl}
+import challenge.repository._
 import challenge.service.{InvoicesService, PayersService, PaymentsService}
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -50,10 +50,11 @@ class ChallengeTest extends AnyFreeSpec with Matchers with MockitoSugar {
   val payerRepo = new PayerRepositoryImpl
   val paymentRepo = new PaymentRepositoryImpl
   val invoiceRepo = new InvoiceRepositoryImpl
+  val paymentInvoiceRepo = new PaymentInvoiceRepositoryImpl
 
   val payersService: PayersService[IO] = PayersService.impl(payerRepo)
   val invoicesService: InvoicesService[IO] = InvoicesService.impl(invoiceRepo)
-  val paymentsService: PaymentsService[IO] = PaymentsService.impl(paymentRepo)
+  val paymentsService: PaymentsService[IO] = PaymentsService.impl(paymentRepo, invoiceRepo, paymentInvoiceRepo)
   
   val invoiceRoutes: HttpRoutes[IO] = new InvoiceRoutes(invoicesService).routes
   val paymentRoutes: HttpRoutes[IO] = new PaymentRoutes(paymentsService).routes

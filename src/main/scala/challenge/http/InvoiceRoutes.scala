@@ -5,6 +5,7 @@ import challenge.model.invoices.InvoiceId.InvoiceId
 import challenge.model.invoices.NewInvoice._
 import challenge.service.InvoicesService
 import org.http4s.HttpRoutes
+import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.dsl.Http4sDsl
 
 class InvoiceRoutes(invoiceService: InvoicesService[IO]) extends Http4sDsl[IO] {
@@ -16,6 +17,9 @@ class InvoiceRoutes(invoiceService: InvoicesService[IO]) extends Http4sDsl[IO] {
         case Some(invoice) => Ok(invoice)
         case None          => NotFound()
       }
+
+    case GET -> Root / "invoicePayments" / IntVar(invoiceId) =>
+      invoiceService.getPaymentsByInvoice(InvoiceId(invoiceId)).flatMap(Ok(_))
 
     case req @ POST -> Root / "invoice" =>
       req.decode[NewInvoice] { input =>

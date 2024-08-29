@@ -24,6 +24,10 @@ Updated timestamps to UTC: Changed the implementation to store timestamps in UTC
 2. Implemented fall back balance calculation from invoices and payments if balance DB is down. 
 3. Refactor project structure
 
+**Part 3 & 4:** 
+1. Unfortunately, I ran out of time and couldn't get a working solution for both parts.
+2. Happy to discuss my approach to both parts in a follow up conversation. 
+
 <!-- END of Notes -->
 
 ## Overview
